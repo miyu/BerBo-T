@@ -25,7 +25,7 @@ namespace Berbot.Monitoring {
 
       public void BeginMonitoring() {
          var client = connectionFactory.CreateModRedditClient();
-         var subreddit = client.Subreddit(connectionFactory.SubredditName);
+         var subreddit = client.Subreddit(BerbotConfiguration.RedditSubredditName);
 
          subreddit.Comments.NewUpdated += (_, e) => {
             foreach (var c in e.Added) {
@@ -42,7 +42,7 @@ namespace Berbot.Monitoring {
 
       public void NotifyInitialActiveSet() {
          var client = connectionFactory.CreateModRedditClient();
-         var subreddit = client.Subreddit(connectionFactory.SubredditName);
+         var subreddit = client.Subreddit(BerbotConfiguration.RedditSubredditName);
 
          log.WriteLine("Notifying initial active set");
          foreach (var post in subreddit.Posts.New.Concat(subreddit.Posts.Hot).Distinct(RedditUtils.PostEqualityComparer)) {

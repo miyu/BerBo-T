@@ -13,5 +13,7 @@ namespace Berbot {
 
       public const string RedditBotRefreshToken = "";
       public const string RedditBotAccessToken = "";
+
+      public const string RedditSubredditName = "";
    }
 }

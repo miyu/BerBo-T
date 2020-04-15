@@ -36,7 +36,5 @@ namespace Berbot {
       public AuditClient CreateAuditClient() {
          return new AuditClient(logManager.CreateContextLog("audit"), this);
       }
-
-      public string SubredditName => "SandersForPresident";
    }
 }

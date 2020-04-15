@@ -15,7 +15,7 @@ namespace Berbot.Monitoring {
          this.connectionFactory = connectionFactory;
          this.auditClient = connectionFactory.CreateAuditClient();
          this.modRedditClient = connectionFactory.CreateModRedditClient();
-         this.subreddit = modRedditClient.Subreddit(connectionFactory.SubredditName);
+         this.subreddit = modRedditClient.Subreddit(BerbotConfiguration.RedditSubredditName);
       }
 
       public UserFlairContext CreateFlairContext(string username) {

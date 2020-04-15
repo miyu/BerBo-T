@@ -65,7 +65,7 @@ namespace Berbot.Monitoring {
 
             foreach (var comment in redditClient.EnumerateUserPostsTimeDescending(e.Author)) {
                // Only count scores from our sub
-               if (comment.Subreddit == connectionFactory.SubredditName) {
+               if (comment.Subreddit == BerbotConfiguration.RedditSubredditName) {
                   subredditPostsAnalyzed++;
 
                   // Don't count comments from before mods can get to them.
