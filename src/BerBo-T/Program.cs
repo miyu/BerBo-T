@@ -27,30 +27,40 @@ namespace Berbot {
          var initLog = logManager.CreateContextLog("init");
          initLog.WriteLine("Load Config");
 
-         var configuration = new BerbotConnectionFactory(logManager);
+         var connectionFactory = new BerbotConnectionFactory(logManager);
          
          initLog.WriteLine("Load Audit");
-         var initAudit = configuration.CreateAuditClient();
+         var initAudit = connectionFactory.CreateAuditClient();
          initAudit.WriteAudit("init", Environment.MachineName, "Initializing");
 
          initLog.WriteLine("Load Content Monitor");
-         var contentMonitor = new UserContentMonitor(logManager.CreateContextLog("content-monitor"), configuration);
+         var contentMonitor = new UserContentMonitor(logManager.CreateContextLog("content-monitor"), connectionFactory);
 
          initLog.WriteLine("Load Autoflairer");
-         var userFlairContextFactory = new UserFlairContextFactory(configuration);
+         var userFlairContextFactory = new UserFlairContextFactory(connectionFactory);
          new Thread(() => {
-            var autoflairerContentQueue = new BlockingCollection<UserContentPostedEventArgs>();
-            contentMonitor.ContentPosted += autoflairerContentQueue.Add;
+            var autoflairerCatchUpQueue = new ConcurrentQueue<UserContentPostedEventArgs>();
+            var autoflairerNewContentQueue = new BlockingCollection<UserContentPostedEventArgs>();
+            contentMonitor.ContentPosted += x => {
+               if (x.IsCatchUpLog) autoflairerCatchUpQueue.Enqueue(x);
+               else autoflairerNewContentQueue.Add(x);
+            };
 
             var autoflairerLog = logManager.CreateContextLog("autoflairer");
-            var autoflairer = new Autoflairer(configuration, userFlairContextFactory, autoflairerLog, autoflairerContentQueue);
+            var userHistoryCache = new UserHistoryCache(logManager.CreateContextLog("autoflairer-user-history"), connectionFactory);
+            userHistoryCache.Query("ItzWarty");
+            var autoflairer = new Autoflairer(connectionFactory, userFlairContextFactory, autoflairerLog, userHistoryCache);
 
             for (long i = 0;; i++) {
                if (i % 100 == 0) {
-                  autoflairerLog.WriteLine($"Processing element {i} of autoflairer queue, backlog {autoflairerContentQueue.Count}.");
+                  autoflairerLog.WriteLine($"Processing element {i} of autoflairer queue, new backlog {autoflairerNewContentQueue.Count}, catch up {autoflairerCatchUpQueue.Count}.");
                }
 
-               var e = autoflairerContentQueue.Take();
+               // Take from new queue, else take from catch-up queue, else wait on new queue.
+               var e =
+                  autoflairerNewContentQueue.Count == 0 && autoflairerCatchUpQueue.TryDequeue(out var catchUpEvent)
+                     ? catchUpEvent
+                     : autoflairerNewContentQueue.Take();
 
                try {
                   autoflairer.HandleContentPosted(e);
@@ -66,7 +76,7 @@ namespace Berbot {
          contentMonitor.NotifyInitialActiveSet();
 
          initLog.WriteLine("Load Inbox Monitor");
-         var inboxMonitor = new InboxMonitor(logManager.CreateContextLog("inbox-monitor"), configuration);
+         var inboxMonitor = new InboxMonitor(logManager.CreateContextLog("inbox-monitor"), connectionFactory);
          inboxMonitor.BeginMonitoring();
 
          initAudit.WriteAudit("init", Environment.MachineName, "Initialized");

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Dargon.Commons;
 using Dargon.Commons.Collections;
@@ -12,16 +13,18 @@ using Post = Reddit.Controllers.Post;
 
 namespace Berbot.Utils {
    public static class RedditClientExtensions {
-      public static IEnumerable<Comment> EnumerateUserPostsTimeDescending(this RedditClient client, string username) {
+      public static IEnumerable<Comment> EnumerateUserCommentsTimeDescending(this RedditClient client, string username) {
+         return EnumerateUserCommentsBatchedTimeDescending(client, username).SelectMany(x => x);
+      }
+
+      public static IEnumerable<List<Comment>> EnumerateUserCommentsBatchedTimeDescending(this RedditClient client, string username) {
          var user = client.User(username);
          var afterFullName = "";
          while (true) {
-            var comments = user.GetCommentHistory(after: afterFullName);
+            var comments = user.GetCommentHistory(after: afterFullName, limit: 100);
             if (comments.Count == 0) break;
 
-            foreach (var comment in comments) {
-               yield return comment;
-            }
+            yield return comments;
 
             afterFullName = comments[^1].Fullname;
          }

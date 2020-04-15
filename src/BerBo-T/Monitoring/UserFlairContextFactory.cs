@@ -1,4 +1,5 @@
 ﻿using Berbot.Auditing;
+using Dargon.Commons;
 using Reddit;
 using Reddit.Things;
 using Subreddit = Reddit.Controllers.Subreddit;
@@ -18,9 +19,13 @@ namespace Berbot.Monitoring {
          this.subreddit = modRedditClient.Subreddit(BerbotConfiguration.RedditSubredditName);
       }
 
-      public UserFlairContext CreateFlairContext(string username) {
+      public UserFlairContext CreateAndFetchLatestFlairContext(string username) {
          var currentFlair = subreddit.Flairs.FlairSelector(username);
          return new UserFlairContext(auditClient, subreddit.Flairs, username, currentFlair.Current.FlairText, currentFlair.Current.FlairCssClass);
+      }
+
+      public UserFlairContext CreatePreloadedFlairContext(string username, string flairText, string flairCssClass) {
+         return new UserFlairContext(auditClient, subreddit.Flairs, username, flairText, flairCssClass);
       }
    }
 }

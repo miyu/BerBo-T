@@ -15,5 +15,12 @@ namespace Berbot {
       public const string RedditBotAccessToken = "";
 
       public const string RedditSubredditName = "";
+      
+      public static readonly HashSet<string> AutoflareUserIgnoreList = new HashSet<string> {
+         "AutoModerator",
+      };
+      
+      public static readonly HashSet<string> AutoflareCssClassIgnoreList = new HashSet<string> {
+      };
    }
 }

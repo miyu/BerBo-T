@@ -29,22 +29,7 @@ namespace Berbot.Utils {
       }
 
       public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) {
-         if (value == null) {
-            writer.WriteNull();
-            return;
-         }
-
          serializer.Serialize(writer, value);
-         return;
-
-         var elements = new List<JObject>();
-         foreach (var inst in (IList)value) {
-            var obj = JObject.FromObject(inst);
-            obj.Add(TYPE_PROPERTY_NAME, GetPocoType(inst));
-            elements.Add(obj);
-         }
-         
-         new JArray(elements).WriteTo(writer);
       }
 
       public abstract object ConstructPocoOfType(string type);

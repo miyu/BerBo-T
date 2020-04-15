@@ -30,6 +30,7 @@ namespace Berbot {
       public DbClient CreateDbClient() {
          var dbConnectionString = "User ID=postgres;Password=password;Host=localhost;Port=5432;Database=postgres;Pooling=true;SearchPath=berbot";
          var connection = new NpgsqlConnection(dbConnectionString);
+         Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
          return new DbClient(connection);
       }
 

@@ -1,5 +1,6 @@
 ﻿using Berbot.Auditing;
 using Berbot.Logging;
+using Dargon.Commons;
 using Reddit.Controllers;
 
 namespace Berbot.Monitoring {
@@ -10,6 +11,10 @@ namespace Berbot.Monitoring {
       private string remoteCssClass;
 
       public UserFlairContext(AuditClient auditClient, Flairs flairsController, string username, string text, string flairCssClass) {
+         username.ThrowIfNull(nameof(username));
+         text ??= "";
+         flairCssClass ??= "";
+
          this.auditClient = auditClient;
          this.flairsController = flairsController;
          Username = username;
@@ -25,8 +30,8 @@ namespace Berbot.Monitoring {
       public string Text { get; set; }
       public string FlairCssClass { get; set; }
 
-      public void Update() {
-         if (Text == remoteText && FlairCssClass == remoteCssClass) return;
+      public void Commit() {
+         if (!IsSemanticallyChanged) return;
 
          auditClient.WriteAuditFlairUpdate(Username, remoteText, remoteCssClass, Text, FlairCssClass);
          // flairsController.CreateUserFlair(Username, Text, FlairCssClass);
@@ -34,6 +39,9 @@ namespace Berbot.Monitoring {
          remoteText = Text;
          remoteCssClass = FlairCssClass;
       }
+
+      public bool IsSemanticallyChanged 
+         => Text.Trim() != remoteText.Trim() || (!string.IsNullOrWhiteSpace(Text) && FlairCssClass != remoteCssClass);
 
       public void SetNewContributor(bool value) {
          var fragment = "🌱 New Contributor";
