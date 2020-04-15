@@ -1,0 +1,17 @@
+﻿// Rename this to BerbotConfiguration.cs & fill out below.
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Berbot {
+   public static class BerbotConfiguration {
+      public const string RedditAppId = "";
+      public const string RedditAppSecret = "";
+
+      public const string RedditModRefreshToken = "";
+      public const string RedditModAccessToken = "";
+
+      public const string RedditBotRefreshToken = "";
+      public const string RedditBotAccessToken = "";
+   }
+}

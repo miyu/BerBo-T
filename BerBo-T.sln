@@ -1,0 +1,61 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30002.166
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BerBo-T", "src\BerBo-T\BerBo-T.csproj", "{93E9D2BF-D685-43A6-BCF3-0C2C422489EF}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{2E887845-B3F0-4B8E-94FA-1ACE089F02F6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dargon.Commons", "dependencies\dargon\framework\src\Dargon.Commons\src\Dargon.Commons.csproj", "{38D52466-80B7-47F1-96BA-3413C12E2F11}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dargon.Repl", "dependencies\dargon\framework\src\Dargon.Repl\src\Dargon.Repl.csproj", "{85CEFF1E-EF9F-4E8C-80F7-D33A5E158A2A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NMockito", "dependencies\dargon\framework\src\NMockito\src\NMockito\NMockito.csproj", "{D9D5B2D0-AECF-428A-8F50-87213D488598}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{ACCEE1AA-1508-408F-ACA2-F31FB9599B68}"
+	ProjectSection(SolutionItems) = preProject
+		provision.sql = provision.sql
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PayloadScratchpad", "tools\PayloadScratchpad\PayloadScratchpad.csproj", "{93590D3A-3F1D-4BE7-A1AE-AF0E10B8C785}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{93E9D2BF-D685-43A6-BCF3-0C2C422489EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93E9D2BF-D685-43A6-BCF3-0C2C422489EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93E9D2BF-D685-43A6-BCF3-0C2C422489EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93E9D2BF-D685-43A6-BCF3-0C2C422489EF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38D52466-80B7-47F1-96BA-3413C12E2F11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38D52466-80B7-47F1-96BA-3413C12E2F11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38D52466-80B7-47F1-96BA-3413C12E2F11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38D52466-80B7-47F1-96BA-3413C12E2F11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{85CEFF1E-EF9F-4E8C-80F7-D33A5E158A2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{85CEFF1E-EF9F-4E8C-80F7-D33A5E158A2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{85CEFF1E-EF9F-4E8C-80F7-D33A5E158A2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{85CEFF1E-EF9F-4E8C-80F7-D33A5E158A2A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9D5B2D0-AECF-428A-8F50-87213D488598}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9D5B2D0-AECF-428A-8F50-87213D488598}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9D5B2D0-AECF-428A-8F50-87213D488598}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9D5B2D0-AECF-428A-8F50-87213D488598}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93590D3A-3F1D-4BE7-A1AE-AF0E10B8C785}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93590D3A-3F1D-4BE7-A1AE-AF0E10B8C785}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93590D3A-3F1D-4BE7-A1AE-AF0E10B8C785}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93590D3A-3F1D-4BE7-A1AE-AF0E10B8C785}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{38D52466-80B7-47F1-96BA-3413C12E2F11} = {2E887845-B3F0-4B8E-94FA-1ACE089F02F6}
+		{85CEFF1E-EF9F-4E8C-80F7-D33A5E158A2A} = {2E887845-B3F0-4B8E-94FA-1ACE089F02F6}
+		{D9D5B2D0-AECF-428A-8F50-87213D488598} = {2E887845-B3F0-4B8E-94FA-1ACE089F02F6}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B2420CC4-6A5A-4B46-A93D-9AEC042107C5}
+	EndGlobalSection
+EndGlobal

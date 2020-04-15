@@ -1,0 +1,3 @@
+[submodule "dependencies/dargon"]
+	path = dependencies/dargon
+	url = git@github.com:the-dargon-project/dargon.git
