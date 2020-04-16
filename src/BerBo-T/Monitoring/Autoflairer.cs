@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
+using Berbot.Auditing;
 using Berbot.Logging;
 using Berbot.Utils;
 using Dargon.Commons;
@@ -17,10 +18,11 @@ namespace Berbot.Monitoring {
       private readonly UserHistoryCache userHistoryCache;
       private readonly DbClient dbClient;
       private readonly RedditClient redditClient;
+      private readonly AuditClient auditClient;
 
-      private const string KVSTORE_TYPE_IS_NOOB_CACHE = "flair-newb";
+      public const string KVSTORE_TYPE_IS_NOOB_CACHE = "flair-newb";
 
-      private Dictionary<string, (DateTime t, bool lastIsNewb)> userToNextEvaluationTime = new Dictionary<string, (DateTime t, bool lastIsNewb)>();
+      private Dictionary<string, (DateTime t, string newContributorString)> userToNextEvaluationTime = new Dictionary<string, (DateTime t, string newContributorString)>();
 
       public Autoflairer(BerbotConnectionFactory connectionFactory, UserFlairContextFactory userFlairContextFactory, ILog log, UserHistoryCache userHistoryCache) {
          this.connectionFactory = connectionFactory;
@@ -29,6 +31,7 @@ namespace Berbot.Monitoring {
          this.userHistoryCache = userHistoryCache;
          this.dbClient = connectionFactory.CreateDbClient();
          this.redditClient = connectionFactory.CreateModRedditClient();
+         this.auditClient = connectionFactory.CreateAuditClient();
       }
 
       public void HandleContentPosted(UserContentPostedEventArgs e) {
@@ -42,27 +45,55 @@ namespace Berbot.Monitoring {
          if (userToNextEvaluationTime.TryGetValue(e.Author, out var record)) {
             if (e.IsCatchUpLog) {
                log.WriteLine($"Skipping catch-up for {e.Author} as already evaluated.");
-               log.WriteLine($"IsNewContributor: {record.lastIsNewb}");
+               log.WriteLine(record.newContributorString);
                return;
             }
 
             var isPastReevaluationThreshold = now > record.t;
             log.WriteLine($"User visited previously. Next reevaluation at {record}, now {now}. Past? {isPastReevaluationThreshold}");
             if (!isPastReevaluationThreshold) {
-               log.WriteLine($"IsNewContributor: {record.lastIsNewb}");
+               log.WriteLine(record.newContributorString);
                return;
             }
          }
 
-         const int NewbieKarmaThreshold = 200;
+         var result = Reflair(e.Author, e.AuthorFlairText, e.AuthorFlairCssClass);
+
+         auditClient.WriteAuditPostDataPoint(new ProcessedPostDataPoint {
+            Author = e.Author,
+            FullName = e.IsCatchUpLog ? "[catch-up]" : e.FullName,
+            IsNewContributor = result.IsNewContributor,
+            ShortText = (e.Title ?? e.Content).ToShortString(),
+            IsCatchUp = e.IsCatchUpLog,
+
+            SubredditScore = result.SubredditScore,
+            SubredditTooNewScore = result.SubredditTooNewScore,
+            SubredditCommentsAnalyzed = result.SubredditCommentsAnalyzed,
+            SubredditTooNewCommentsCount = result.SubredditTooNewCommentsCount,
+            TotalCommentsAnalyzed = result.TotalCommentsAnalyzed,
+         });
+      }
+
+      public ReflairResult Reflair(string username, string knownFlairTextOpt, string knownFlairCssClassOpt) {
+         // Stop aggregating karma past this positive point.
+         // This ensures that if a user has a negative past but a sufficiently positive future, their negative
+         // past doesn't outweigh it.
+         const int StopAggregationKarmaThreshold = 250;
+         (int posts, int karma)[] PostsAndKarmaThresholds = new[] {
+            (10, 200),
+            (20, 100),
+            (30, 50)
+         };
+
 
          var subredditScore = 0;
          var tooNewCommentCount = 0;
          var tooNewCommentScore = 0;
          var postsAnalyzed = 0;
          var subredditPostsAnalyzed = 0;
-
-         var userHistory = userHistoryCache.Query(e.Author);
+         
+         var now = DateTime.Now;
+         var userHistory = userHistoryCache.Query(username);
          foreach (var comment in userHistory.Comments.OrderByDescending(c => c.CreationTime)) {
             // Only count scores from our sub
             if (comment.Subreddit == BerbotConfiguration.RedditSubredditName) {
@@ -86,20 +117,28 @@ namespace Berbot.Monitoring {
             }
 
             // Bail if we can guess the outcome
-            if (subredditScore > NewbieKarmaThreshold * 2 || subredditScore < -500) {
+            if (subredditScore > StopAggregationKarmaThreshold * 2 || subredditScore < -500) {
                log.WriteLine($"Bailing at score threshold, score {subredditScore}");
                break;
             }
          }
 
-         log.WriteLine($"Done counting {postsAnalyzed} comments for {e.Author}, {subredditPostsAnalyzed} in sub, total score {subredditScore}");
+         log.WriteLine($"Done counting {postsAnalyzed} comments for {username}, {subredditPostsAnalyzed} in sub, total score {subredditScore}");
 
          if (tooNewCommentCount != 0) {
             log.WriteLine($"{tooNewCommentCount} comments were too new to be counted, score {tooNewCommentScore}");
          }
 
-         var isNoob = subredditScore < NewbieKarmaThreshold;
-         log.WriteLine($"Evaluted IsNoob for {e.Author} => {isNoob}");
+         var isNoob = true;
+         foreach (var (postCountThreshold, karmaThreshold) in PostsAndKarmaThresholds) {
+            var pass = subredditPostsAnalyzed >= postCountThreshold && subredditScore >= karmaThreshold;
+            if (pass) {
+               log.WriteLine($"Passed Noob Threshold >= {postCountThreshold} Posts && >= {karmaThreshold} Score");
+               isNoob = false;
+               break;
+            }
+         }
+         log.WriteLine($"Evaluted IsNoob for {username} => {isNoob}");
 
          bool isNewContributor = isNoob;
          void UpdateFlairContext(UserFlairContext context) {
@@ -108,22 +147,39 @@ namespace Berbot.Monitoring {
          }
 
          // First, trial run with flair from comment state, which can be quite old depending on queue depth
-         var staleFlareContext = userFlairContextFactory.CreatePreloadedFlairContext(e.Author, e.AuthorFlairText, e.AuthorFlairCssClass);
+         var trialRunEnabled = knownFlairTextOpt != null;
+         UserFlairContext trialFlairContext = null;
 
-         UpdateFlairContext(staleFlareContext);
+         if (trialRunEnabled) {
+            trialFlairContext = userFlairContextFactory.CreatePreloadedFlairContext(username, knownFlairTextOpt, knownFlairCssClassOpt);
+            UpdateFlairContext(trialFlairContext);
+         }
 
-         if (staleFlareContext.IsSemanticallyChanged) {
+         var flairChanged = false;
+         if (!trialRunEnabled || trialFlairContext.IsSemanticallyChanged) {
             // Now pull latest flare context, update, and push that
-            var flareContext = userFlairContextFactory.CreateAndFetchLatestFlairContext(e.Author);
+            var flareContext = userFlairContextFactory.CreateAndFetchLatestFlairContext(username);
             UpdateFlairContext(flareContext);
-            flareContext.Commit();
+            flairChanged = flareContext.Commit();
          }
 
          // debounce by 5 minutes.
          // for future: if no post happens between now and then, we should probably still exec in 5m to make
          // circumvention harder.
-         userToNextEvaluationTime[e.Author] = (now + TimeSpan.FromMinutes(5), isNewContributor);
-         log.WriteLine($"IsNewContributor: {isNewContributor}");
+         var newContributorString = $"{username} IsNewContributor: {isNewContributor}, Score {subredditScore} ({tooNewCommentScore}), Posts {subredditPostsAnalyzed} ({tooNewCommentCount}) of {postsAnalyzed}";
+         userToNextEvaluationTime[username] = (now + TimeSpan.FromMinutes(5), newContributorString);
+         log.WriteLine(newContributorString);
+
+         return new ReflairResult {
+            DebugString = newContributorString,
+            FlairChanged = flairChanged,
+            IsNewContributor = isNoob,
+            SubredditScore = subredditScore,
+            SubredditTooNewScore = tooNewCommentScore,
+            SubredditCommentsAnalyzed = subredditPostsAnalyzed,
+            SubredditTooNewCommentsCount = tooNewCommentCount,
+            TotalCommentsAnalyzed = postsAnalyzed,
+         };
       }
 
       private bool IsNoobCacheEntryValid(KeyValueEntry entry, out bool isNoob) {
@@ -133,6 +189,17 @@ namespace Berbot.Monitoring {
          if (!bool.TryParse(entry.Value, out isNoob)) return false;
 
          return !isNoob || DateTime.Now - entry.UpdatedAt > TimeSpan.FromHours(24);
+      }
+
+      public class ReflairResult {
+         public string DebugString;
+         public bool FlairChanged;
+         public bool IsNewContributor;
+         public int SubredditScore;
+         public int SubredditTooNewScore;
+         public int SubredditCommentsAnalyzed;
+         public int SubredditTooNewCommentsCount;
+         public int TotalCommentsAnalyzed;
       }
    }
 }

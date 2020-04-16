@@ -30,14 +30,21 @@ namespace Berbot.Monitoring {
       public string Text { get; set; }
       public string FlairCssClass { get; set; }
 
-      public void Commit() {
-         if (!IsSemanticallyChanged) return;
+      public bool Commit() {
+         if (!IsSemanticallyChanged) {
+            return false;
+         }
 
          auditClient.WriteAuditFlairUpdate(Username, remoteText, remoteCssClass, Text, FlairCssClass);
-         // flairsController.CreateUserFlair(Username, Text, FlairCssClass);
+
+         if (!BerbotConfiguration.ExecuteReadOnlyDryMode) {
+            flairsController.CreateUserFlair(Username, Text, FlairCssClass);
+         }
 
          remoteText = Text;
          remoteCssClass = FlairCssClass;
+
+         return true;
       }
 
       public bool IsSemanticallyChanged 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Berbot.Logging;
+using Berbot.Utils;
 
 namespace Berbot.Auditing {
    public class AuditClient {
@@ -24,6 +25,10 @@ namespace Berbot.Auditing {
       private void WriteAuditInternal(string type, string subject, string data) {
          log.WriteLine($"{type}, {subject}: {data}");
          db.WriteAudit(type, subject, data);
+      }
+
+      public void WriteAuditPostDataPoint(ProcessedPostDataPoint dataPoint) {
+         db.WriteAudit("post-data-point", dataPoint.Author, JsonUtils.ToJson(dataPoint));
       }
    }
 }

@@ -73,6 +73,12 @@ namespace Berbot.Monitoring {
          return snapshot;
       }
 
+      public List<string> GetKnownUsernames() {
+         return dbClient.EnumerateKeyValueEntries(KVSTORE_USER_HISTORY_ENTRY_TYPE)
+                        .Select(x => x.Key)
+                        .ToList();
+      }
+
       private bool TryParseUserHistorySnapshot(string json, out UserHistorySnapshot res) {
          try {
             res = JsonUtils.Parse<UserHistorySnapshot>(json);

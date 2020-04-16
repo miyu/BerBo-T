@@ -14,7 +14,8 @@ namespace Berbot.Logging {
 
       internal void HandleWriteLine(Log log, string message) {
          lock (sync) {
-            Console.WriteLine($"[{log.Name}] {message}");
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            Console.WriteLine($"{timestamp} [{log.Name}] {message}");
          }
       }
    }

@@ -5,6 +5,11 @@ using System.Text;
 
 namespace Berbot {
    public static class BerbotConfiguration {
+      // DRY RUN MODE:
+      // Set to true to test bot w/o making any changes to sub.
+      // (The bot will still write to its own DB)
+      public const bool ExecuteReadOnlyMode = false;
+
       public const string RedditAppId = "";
       public const string RedditAppSecret = "";
 

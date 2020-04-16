@@ -48,6 +48,14 @@ RETURNING *", new {
 
       public KeyValueEntry PutKeyValueEntry(KeyValueEntry entry) 
          => PutKeyValueEntry(entry.Type, entry.Key, entry.Value);
+
+      public IEnumerable<KeyValueEntry> EnumerateKeyValueEntries(string type) {
+         return conn.Query<KeyValueEntry>(@"
+SELECT * FROM kvstore
+WHERE type = @Type", new {
+            Type = type
+         });
+      }
    }
 
    public class KeyValueEntry {
