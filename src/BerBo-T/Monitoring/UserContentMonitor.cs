@@ -38,6 +38,7 @@ namespace Berbot.Monitoring {
                HandlePostAdded(p, false);
             }
          };
+         subreddit.Posts.MonitorNew();
       }
 
       public void NotifyInitialActiveSet() {
