@@ -1,0 +1,13 @@
+{
+    "version": "1.0.0",
+    "name": "asp.net",
+    "private": true,
+    "devDependencies": {
+        "@types/signalr": "^2.2.36"
+    },
+    "scripts": {
+        "build": "webpack --mode=development --watch",
+        "release": "webpack --mode=production",
+        "publish": "npm run release && dotnet publish -c Release"
+    }
+}

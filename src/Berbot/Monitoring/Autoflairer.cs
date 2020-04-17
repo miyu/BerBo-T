@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Metadata.Ecma335;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Berbot.Auditing;
 using Berbot.Logging;
@@ -19,10 +20,11 @@ namespace Berbot.Monitoring {
       private readonly DbClient dbClient;
       private readonly RedditClient redditClient;
       private readonly AuditClient auditClient;
+      private int currentMonitoringEpoch = 0;
 
       public const string KVSTORE_TYPE_IS_NOOB_CACHE = "flair-newb";
 
-      private Dictionary<string, (DateTime t, string newContributorString)> userToNextEvaluationTime = new Dictionary<string, (DateTime t, string newContributorString)>();
+      private Dictionary<string, (DateTime t, string newContributorString, int monitoringEpoch)> userToNextEvaluationTime = new Dictionary<string, (DateTime t, string newContributorString, int monitoringEpoch)>();
 
       public Autoflairer(BerbotConnectionFactory connectionFactory, UserFlairContextFactory userFlairContextFactory, ILog log, UserHistoryCache userHistoryCache) {
          this.connectionFactory = connectionFactory;
@@ -34,6 +36,10 @@ namespace Berbot.Monitoring {
          this.auditClient = connectionFactory.CreateAuditClient();
       }
 
+      public void IncrementMonitoringEpoch() {
+         currentMonitoringEpoch++;
+      }
+
       public void HandleContentPosted(UserContentPostedEventArgs e) {
          if (e.IsDeletedAuthor || BerbotConfiguration.AutoflareUserIgnoreList.Contains(e.Author)) {
             return;
@@ -43,21 +49,25 @@ namespace Berbot.Monitoring {
 
          var now = DateTime.Now;
          if (userToNextEvaluationTime.TryGetValue(e.Author, out var record)) {
-            if (e.IsCatchUpLog) {
-               log.WriteLine($"Skipping catch-up for {e.Author} as already evaluated.");
-               log.WriteLine(record.newContributorString);
-               return;
-            }
+            if (record.monitoringEpoch != currentMonitoringEpoch) {
+               // TODO: Detect autoflairer circumvention here.
+            } else {
+               if (e.IsCatchUpLog) {
+                  log.WriteLine($"Skipping catch-up for {e.Author} as already evaluated.");
+                  log.WriteLine(record.newContributorString);
+                  return;
+               }
 
-            var isPastReevaluationThreshold = now > record.t;
-            log.WriteLine($"User visited previously. Next reevaluation at {record}, now {now}. Past? {isPastReevaluationThreshold}");
-            if (!isPastReevaluationThreshold) {
-               log.WriteLine(record.newContributorString);
-               return;
+               var isPastReevaluationThreshold = now > record.t;
+               log.WriteLine($"User visited previously. Next reevaluation at {record}, now {now}. Past? {isPastReevaluationThreshold}");
+               if (!isPastReevaluationThreshold) {
+                  log.WriteLine(record.newContributorString);
+                  return;
+               }
             }
          }
 
-         var result = Reflair(e.Author, e.AuthorFlairText, e.AuthorFlairCssClass);
+         var result = Reflair(e.Author, e.AuthorFlairText ?? "", e.AuthorFlairCssClass ?? "");
 
          auditClient.WriteAuditPostDataPoint(new ProcessedPostDataPoint {
             Author = e.Author,
@@ -65,6 +75,7 @@ namespace Berbot.Monitoring {
             IsNewContributor = result.IsNewContributor,
             ShortText = (e.Title ?? e.Content).ToShortString(),
             IsCatchUp = e.IsCatchUpLog,
+            FlairChanged = result.FlairChanged,
 
             SubredditScore = result.SubredditScore,
             SubredditTooNewScore = result.SubredditTooNewScore,
@@ -167,7 +178,7 @@ namespace Berbot.Monitoring {
          // for future: if no post happens between now and then, we should probably still exec in 5m to make
          // circumvention harder.
          var newContributorString = $"{username} IsNewContributor: {isNewContributor}, Score {subredditScore} ({tooNewCommentScore}), Posts {subredditPostsAnalyzed} ({tooNewCommentCount}) of {postsAnalyzed}";
-         userToNextEvaluationTime[username] = (now + TimeSpan.FromMinutes(5), newContributorString);
+         userToNextEvaluationTime[username] = (now + TimeSpan.FromMinutes(5), newContributorString, currentMonitoringEpoch);
          log.WriteLine(newContributorString);
 
          return new ReflairResult {

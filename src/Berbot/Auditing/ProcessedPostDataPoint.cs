@@ -10,5 +10,6 @@
       public int SubredditCommentsAnalyzed { get; set; }
       public int SubredditTooNewCommentsCount { get; set; }
       public int TotalCommentsAnalyzed { get; set; }
+      public bool FlairChanged { get; set; }
    }
 }

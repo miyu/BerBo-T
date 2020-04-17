@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\dependencies\dargon\framework\src\Dargon.Commons\src\Dargon.Commons.csproj" />
-    <ProjectReference Include="..\BerBo-T\BerBo-T.csproj" />
+    <ProjectReference Include="..\Berbot\Berbot.csproj" />
   </ItemGroup>
 
 </Project>

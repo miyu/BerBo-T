@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BerBo-T\BerBo-T.csproj" />
+    <ProjectReference Include="..\..\src\BerBo-T\Berbot.csproj" />
   </ItemGroup>
 
 </Project>

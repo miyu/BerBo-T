@@ -14,10 +14,10 @@ using Post = Reddit.Controllers.Post;
 namespace Berbot.Utils {
    public static class RedditClientExtensions {
       public static IEnumerable<Comment> EnumerateUserCommentsTimeDescending(this RedditClient client, string username) {
-         return EnumerateUserCommentsBatchedTimeDescending(client, username).SelectMany(x => x);
+         return EnumerateUserCommentsBatchedTimeDescendingLimit1000ish(client, username).SelectMany(x => x);
       }
 
-      public static IEnumerable<List<Comment>> EnumerateUserCommentsBatchedTimeDescending(this RedditClient client, string username) {
+      public static IEnumerable<List<Comment>> EnumerateUserCommentsBatchedTimeDescendingLimit1000ish(this RedditClient client, string username) {
          var user = client.User(username);
          var afterFullName = "";
          while (true) {
