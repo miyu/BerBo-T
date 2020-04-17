@@ -3,7 +3,7 @@ using Dargon.Commons;
 
 namespace Berbot.Monitoring {
    public class UserHistorySnapshot {
-      public List<CommentSnapshot> Comments;
+      public List<CommentSnapshot> Comments = new List<CommentSnapshot>();
 
       public void Validate() {
          Comments.ThrowIfNull("Comments");

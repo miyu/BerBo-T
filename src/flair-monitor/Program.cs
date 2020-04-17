@@ -71,10 +71,15 @@ namespace Berbot {
          contentMonitor.BeginMonitoring();
 
          new Thread(() => {
+            var nextRepopulateTime = DateTime.MinValue;
             while (true) {
-               signalRepopulateCatchUpQueue.Take();
+               while (DateTime.Now < nextRepopulateTime) {
+                  signalRepopulateCatchUpQueue.Take();
+               }
+
                autoflairer.IncrementMonitoringEpoch();
                contentMonitor.NotifyInitialActiveSet();
+               nextRepopulateTime = DateTime.Now + TimeSpan.FromMinutes(5);
 
                // drain queue
                while (signalRepopulateCatchUpQueue.Count > 0) signalRepopulateCatchUpQueue.TryTake(out _);
