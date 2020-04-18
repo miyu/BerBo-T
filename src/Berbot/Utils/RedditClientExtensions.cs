@@ -45,6 +45,19 @@ namespace Berbot.Utils {
          }
       }
 
+      public static IEnumerable<List<Post>> EnumerateUserPostsBatchedTimeDescendingLimit1000ish(this RedditClient client, string username) {
+         var user = client.User(username);
+         var afterFullName = "";
+         while (true) {
+            var posts = user.GetPostHistory(after: afterFullName, limit: 100);
+            if (posts.Count == 0) break;
+
+            yield return posts;
+
+            afterFullName = posts[^1].Fullname;
+         }
+      }
+
       /// <summary>
       /// Note: this is slightly bugged. in https://old.reddit.com/r/SandersForPresident/comments/g0j7gq/bernie_sanders_reportedly_penning_new_book_on/
       /// there are 1414 comments but this only finds 1327... I've a hunch it either skips deleted comments or really deeply nested threads.

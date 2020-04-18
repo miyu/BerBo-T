@@ -33,53 +33,106 @@ namespace Berbot.Monitoring {
             return existingRecord;
          }
 
-         DateTime latestDateToFetch = DateTime.MinValue;
-         var isUpdateMode = existingRecord != null && existingRecord.Comments.Count > 0;
-         if (isUpdateMode) {
-            var newestComment = existingRecord.Comments.MaxBy(c => c.CreationTime);
-
-            // Note: In 7 days a power user makes about ~50-70 comments. Double that for
-            // hand-wavy math and this is 1-2 pages of 100 batched comments from the API
-            // max. This is a reasonable request rate. Most users will fall under the 1 page category.
-            latestDateToFetch = newestComment.CreationTime - TimeSpan.FromDays(7);
-         }
-
-         log.WriteLine("Fetching latest user history: " + username + $" for update?: {isUpdateMode}");
+         log.WriteLine("Fetching latest user history: " + username);
 
          var snapshot = existingRecord ?? new UserHistorySnapshot();
-         var stats = UpdateUserRecordInternal(username, snapshot, isUpdateMode, latestDateToFetch);
+         var commentStats = UpdateUserRecordCommentsInternal(username, snapshot);
+         var postStats = UpdateUserRecordPostsInternal(username, snapshot);
          dbClient.PutKeyValueEntry(KVSTORE_USER_HISTORY_ENTRY_TYPE, username, JsonUtils.ToJson(snapshot));
 
-         log.WriteLine($"Done. {snapshot.Comments.Count} Comments, {stats.added} Added, {stats.updated} Updated.");
+         log.WriteLine($"Done. {snapshot.Comments.Count}c/{snapshot.Posts.Count}p, {commentStats.added}c/{postStats.added}p Added, {commentStats.updated}c/{postStats.updated}p Updated.");
          return snapshot;
       }
 
-      private (int added, int updated) UpdateUserRecordInternal(string username, UserHistorySnapshot record, bool isUpdateMode, DateTime oldestDateToFetch) {
-         var commentsByFullname = record.Comments.ToDictionary(c => c.FullName);
-         var subredditCommentCount = record.Comments.Count(c => c.Subreddit == BerbotConfiguration.RedditSubredditName);
+      private (int added, int updated) UpdateUserRecordCommentsInternal(string username, UserHistorySnapshot record) {
+         var (added, updated, nextComments) = UpdateUserRecordContributionsInternal<CommentSnapshot, Comment>(
+            username,
+            record.Comments,
+            c => new CommentSnapshot {
+               FullName = c.Fullname,
+               Subreddit = c.Subreddit,
+               Score = c.Score,
+               Text = c.Body,
+               CreationTime = c.Created,
+               Removed = c.Removed,
+            },
+            () => redditClient.EnumerateUserCommentsBatchedTimeDescendingLimit1000ish(username),
+            c => c.Created,
+            c => c.Fullname,
+            c => c.Subreddit,
+            "comment");
+         record.Comments = nextComments;
+         return (added, updated);
+      }
+
+      private (int added, int updated) UpdateUserRecordPostsInternal(string username, UserHistorySnapshot record) {
+         var (added, updated, nextPosts) = UpdateUserRecordContributionsInternal<PostSnapshot, Post>(
+            username,
+            record.Posts,
+            p => {
+               var (content, postType) =
+                  p is LinkPost lp ? (lp.URL, PostType.Link) :
+                  p is SelfPost sp ? (sp.SelfText, PostType.Self) :
+                  throw new NotSupportedException("Unknown post type: " + p.GetType().FullName);
+
+               return new PostSnapshot {
+                  FullName = p.Fullname,
+                  Subreddit = p.Subreddit,
+                  Score = p.Score,
+                  Title = p.Title,
+                  Content = content,
+                  PostType = postType,
+                  CreationTime = p.Created,
+                  Removed = p.Removed,
+               };
+            },
+            () => redditClient.EnumerateUserPostsBatchedTimeDescendingLimit1000ish(username),
+            p => p.Created,
+            p => p.Fullname,
+            p => p.Subreddit,
+            "comment");
+         record.Posts = nextPosts;
+         return (added, updated);
+      }
+
+      private (int added, int updated, List<TContributionSnapshot>) UpdateUserRecordContributionsInternal<TContributionSnapshot, TThingController>(
+         string username, 
+         IReadOnlyList<TContributionSnapshot> initialContributions,
+         Func<TThingController, TContributionSnapshot> projectThingToSnapshot,
+         Func<IEnumerable<List<TThingController>>> enumerateBatches,
+         Func<TThingController, DateTime> queryCreationDate,
+         Func<TThingController, string> getFullName,
+         Func<TThingController, string> getSubreddit,
+         string typeVanity
+      ) where TContributionSnapshot : ContributionSnapshot {
+         // Note: In 7 days a power user makes about ~50-70 comments. Double that for
+         // hand-wavy math and this is 1-2 pages of 100 batched comments from the API
+         // max. This is a reasonable request rate. Most users will fall under the 1 page category.
+         DateTime oldestDateToFetch = initialContributions.Count == 0
+            ? DateTime.MinValue
+            : (initialContributions.MaxBy(c => c.CreationTime).CreationTime - TimeSpan.FromDays(7));
+
+         var contributionsByFullName = initialContributions.ToDictionary(c => c.FullName);
+         var subredditContributionCount = initialContributions.Count(c => c.Subreddit == BerbotConfiguration.RedditSubredditName);
          
-         var commentsAdded = 0;
-         var commentsUpdated = 0;
-         foreach (var (i, batch) in redditClient.EnumerateUserCommentsBatchedTimeDescendingLimit1000ish(username).Enumerate()) {
-            var batchCommentsDescending = batch.OrderByDescending(c => c.Created).ToArray();
+         var added = 0;
+         var updated = 0;
+         foreach (var (i, batch) in enumerateBatches().Enumerate()) {
+            var batchCommentsDescending = batch.OrderByDescending(queryCreationDate).ToArray();
             foreach (var c in batchCommentsDescending) {
-               if (!commentsByFullname.ContainsKey(c.Fullname)) {
-                  commentsAdded++;
+               var fullName = getFullName(c);
+               var subreddit = getSubreddit(c);
+
+               if (!contributionsByFullName.ContainsKey(fullName)) {
+                  added++;
                } else {
-                  commentsUpdated++;
+                  updated++;
                }
 
-               commentsByFullname[c.Fullname] = new CommentSnapshot {
-                  FullName = c.Fullname,
-                  Subreddit = c.Subreddit,
-                  Score = c.Score,
-                  Text = c.Body,
-                  CreationTime = c.Created,
-                  Removed = c.Removed,
-               };
+               contributionsByFullName[fullName] = projectThingToSnapshot(c);
 
-               if (c.Subreddit == BerbotConfiguration.RedditSubredditName) {
-                  subredditCommentCount++;
+               if (subreddit == BerbotConfiguration.RedditSubredditName) {
+                  subredditContributionCount++;
                }
             }
 
@@ -92,23 +145,23 @@ namespace Berbot.Monitoring {
             //
             // It is extremely unlikely that someone makes more than 150 posts in a day, given in 16 hours awake,
             // that'd be one post every 6.4 minutes, so I'm not too worried about dropping messages here.
-            if (commentsAdded + commentsUpdated > 150) {
+            if (added + updated > 150) {
                const int earlyBatchCommentThreshold = 5;
-               if (subredditCommentCount < earlyBatchCommentThreshold) {
-                  log.WriteLine($"Bailed after {commentsByFullname.Count} comments, as only {subredditCommentCount} in {BerbotConfiguration.RedditSubredditName}; threshold {earlyBatchCommentThreshold}" + username);
+               if (subredditContributionCount < earlyBatchCommentThreshold) {
+                  log.WriteLine($"Bailed on {username} after {contributionsByFullName.Count} {typeVanity}, as only {subredditContributionCount} in {BerbotConfiguration.RedditSubredditName}; threshold {earlyBatchCommentThreshold}");
                   // return; // disabled to keep fetching til 1k comments or latestDateToFetch
                }
             }
 
             var oldestComment = batchCommentsDescending[^1];
-            if (oldestComment.Created < oldestDateToFetch) {
-               log.WriteLine($"At batch {i} bailing after adding {commentsAdded} updating {commentsUpdated}, as paging={oldestComment.Created} is past {oldestDateToFetch}" + username);
+            var oldestCommentCreationTime = queryCreationDate(oldestComment);
+            if (oldestCommentCreationTime < oldestDateToFetch) {
+               log.WriteLine($"Bailed on {username} at batch {i} after adding {added} updating {updated}, as paging={oldestCommentCreationTime} is past {oldestDateToFetch}" + username);
                break;
             }
          }
 
-         record.Comments = commentsByFullname.Values.OrderByDescending(c => c.CreationTime).ToList();
-         return (commentsAdded, commentsUpdated);
+         return (added, updated, contributionsByFullName.Values.OrderByDescending(c => c.CreationTime).ToList());
       }
 
       public List<string> GetKnownUsernames() {

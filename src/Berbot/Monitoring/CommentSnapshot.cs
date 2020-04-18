@@ -8,11 +8,10 @@ using Newtonsoft.Json;
 using Reddit;
 
 namespace Berbot.Monitoring {
-   public class CommentSnapshot {
+   public class ContributionSnapshot {
       public string FullName;
       public string Subreddit;
       public int Score;
-      public string Text;
       public DateTime CreationTime;
 
       [DefaultValue(false)]
@@ -25,5 +24,20 @@ namespace Berbot.Monitoring {
 
          if (CreationTime == default) throw new Exception("Creation time was empty.");
       }
+   }
+   
+   public class CommentSnapshot : ContributionSnapshot {
+      public string Text;
+   }
+
+   public class PostSnapshot : ContributionSnapshot {
+      public string Title;
+      public string Content;
+      public PostType PostType;
+   }
+
+   public enum PostType {
+      Link,
+      Self,
    }
 }

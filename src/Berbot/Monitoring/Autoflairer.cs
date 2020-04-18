@@ -79,9 +79,9 @@ namespace Berbot.Monitoring {
 
             SubredditScore = result.SubredditScore,
             SubredditTooNewScore = result.SubredditTooNewScore,
-            SubredditCommentsAnalyzed = result.SubredditCommentsAnalyzed,
-            SubredditTooNewCommentsCount = result.SubredditTooNewCommentsCount,
-            TotalCommentsAnalyzed = result.TotalCommentsAnalyzed,
+            SubredditCommentsAnalyzed = result.SubredditContributionsAnalyzed,
+            SubredditTooNewCommentsCount = result.SubredditTooNewContributionsCount,
+            TotalCommentsAnalyzed = result.TotalContributionsAnalyzed,
          });
       }
 
@@ -98,40 +98,44 @@ namespace Berbot.Monitoring {
 
 
          var subredditScore = 0;
-         var tooNewCommentCount = 0;
-         var tooNewCommentScore = 0;
-         var postsAnalyzed = 0;
-         var subredditPostsAnalyzed = 0;
-         var removedSubredditCommentScore = 0;
-         var removedSubredditCommentCount = 0;
+         var tooNewCount = 0;
+         var tooNewScore = 0;
+         var contributionsAnalyzed = 0;
+         var subredditContributionsAnalyzed = 0;
+         var removedSubredditContributionScore = 0;
+         var removedSubredditContributionCount = 0;
 
          var now = DateTime.Now;
          var userHistory = userHistoryCache.Query(username);
-         foreach (var comment in userHistory.Comments.OrderByDescending(c => c.CreationTime)) {
+
+         var orderedContributions = userHistory.Comments.MergeSorted<ContributionSnapshot, long>(userHistory.Posts, x => -x.CreationTime.Ticks);
+
+         // Additional creationtime check as too lazy right now to verify above is properly sorted.
+         foreach (var contribution in orderedContributions.OrderByDescending(c => c.CreationTime)) {
             // Only count scores from our sub
-            if (comment.Subreddit == BerbotConfiguration.RedditSubredditName) {
-               subredditPostsAnalyzed++;
+            if (contribution.Subreddit == BerbotConfiguration.RedditSubredditName) {
+               subredditContributionsAnalyzed++;
 
                // Don't count comments removed by mods.
-               if (comment.Removed) {
-                  removedSubredditCommentCount++;
-                  removedSubredditCommentScore += comment.Score;
+               if (contribution.Removed) {
+                  removedSubredditContributionCount++;
+                  removedSubredditContributionScore += contribution.Score;
                } else {
                   // Don't count comments from before mods can get to them.
-                  if ((now - comment.CreationTime) < TimeSpan.FromDays(3)) {
-                     tooNewCommentCount++;
-                     tooNewCommentScore += comment.Score;
+                  if ((now - contribution.CreationTime) < TimeSpan.FromDays(3)) {
+                     tooNewCount++;
+                     tooNewScore += contribution.Score;
                   } else {
-                     subredditScore += comment.Score;
+                     subredditScore += contribution.Score;
                   }
                }
             }
 
-            postsAnalyzed++;
+            contributionsAnalyzed++;
 
             // Bail if looking too far back
-            if ((DateTime.Now - comment.CreationTime) > TimeSpan.FromDays(365 * 2)) {
-               log.WriteLine($"Bailing at comment age threshold, score {subredditScore}");
+            if ((DateTime.Now - contribution.CreationTime) > TimeSpan.FromDays(365 * 2)) {
+               log.WriteLine($"Bailing at contribution age threshold, score {subredditScore}");
                break;
             }
 
@@ -142,21 +146,21 @@ namespace Berbot.Monitoring {
             }
          }
 
-         log.WriteLine($"Done counting {postsAnalyzed} comments for {username}, {subredditPostsAnalyzed} in sub, total score {subredditScore}");
+         log.WriteLine($"Done counting {contributionsAnalyzed} contributions for {username}, {subredditContributionsAnalyzed} in sub, total score {subredditScore}");
 
-         if (tooNewCommentCount != 0) {
-            log.WriteLine($"{tooNewCommentCount} comments were too new to be counted, score {tooNewCommentScore}");
+         if (tooNewCount != 0) {
+            log.WriteLine($"{tooNewCount} contributions were too new to be counted, score {tooNewScore}");
          }
 
-         if (removedSubredditCommentCount != 0) {
-            log.WriteLine($"{removedSubredditCommentCount} comments were removed, score {removedSubredditCommentScore}");
+         if (removedSubredditContributionCount != 0) {
+            log.WriteLine($"{removedSubredditContributionCount} contributions were removed, score {removedSubredditContributionScore}");
          }
 
          var isNoob = true;
-         foreach (var (postCountThreshold, karmaThreshold) in PostsAndKarmaThresholds) {
-            var pass = subredditPostsAnalyzed >= postCountThreshold && subredditScore >= karmaThreshold;
+         foreach (var (contributionCountThreshold, karmaThreshold) in PostsAndKarmaThresholds) {
+            var pass = subredditContributionsAnalyzed >= contributionCountThreshold && subredditScore >= karmaThreshold;
             if (pass) {
-               log.WriteLine($"Passed Noob Threshold >= {postCountThreshold} Posts && >= {karmaThreshold} Score");
+               log.WriteLine($"Passed Noob Threshold >= {contributionCountThreshold} Contributions && >= {karmaThreshold} Score");
                isNoob = false;
                break;
             }
@@ -189,7 +193,7 @@ namespace Berbot.Monitoring {
          // debounce by 5 minutes.
          // for future: if no post happens between now and then, we should probably still exec in 5m to make
          // circumvention harder.
-         var newContributorString = $"{username} IsNewContributor: {isNewContributor}, Score {subredditScore} ({tooNewCommentScore} new, {removedSubredditCommentScore} rem), Posts {subredditPostsAnalyzed} ({tooNewCommentCount} new, {removedSubredditCommentCount} rem) of {postsAnalyzed}";
+         var newContributorString = $"{username} IsNewContributor: {isNewContributor}, Score {subredditScore} ({tooNewScore} new, {removedSubredditContributionScore} rem), Contributions {subredditContributionsAnalyzed} ({tooNewCount} new, {removedSubredditContributionCount} rem) of {contributionsAnalyzed}";
          userToNextEvaluationTime[username] = (now + TimeSpan.FromMinutes(5), newContributorString, currentMonitoringEpoch);
          log.WriteLine(newContributorString);
 
@@ -198,10 +202,10 @@ namespace Berbot.Monitoring {
             FlairChanged = flairChanged,
             IsNewContributor = isNoob,
             SubredditScore = subredditScore,
-            SubredditTooNewScore = tooNewCommentScore,
-            SubredditCommentsAnalyzed = subredditPostsAnalyzed,
-            SubredditTooNewCommentsCount = tooNewCommentCount,
-            TotalCommentsAnalyzed = postsAnalyzed,
+            SubredditTooNewScore = tooNewScore,
+            SubredditContributionsAnalyzed = subredditContributionsAnalyzed,
+            SubredditTooNewContributionsCount = tooNewCount,
+            TotalContributionsAnalyzed = contributionsAnalyzed,
          };
       }
 
@@ -220,9 +224,9 @@ namespace Berbot.Monitoring {
          public bool IsNewContributor;
          public int SubredditScore;
          public int SubredditTooNewScore;
-         public int SubredditCommentsAnalyzed;
-         public int SubredditTooNewCommentsCount;
-         public int TotalCommentsAnalyzed;
+         public int SubredditContributionsAnalyzed;
+         public int SubredditTooNewContributionsCount;
+         public int TotalContributionsAnalyzed;
       }
    }
 }
