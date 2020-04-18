@@ -85,7 +85,7 @@ namespace Berbot.Monitoring {
          });
       }
 
-      public ReflairResult Reflair(string username, string knownFlairTextOpt, string knownFlairCssClassOpt) {
+      public ReflairResult Reflair(string username, string knownFlairTextOpt = null, string knownFlairCssClassOpt = null) {
          // Stop aggregating karma past this positive point.
          // This ensures that if a user has a negative past but a sufficiently positive future, their negative
          // past doesn't outweigh it.
@@ -102,7 +102,9 @@ namespace Berbot.Monitoring {
          var tooNewCommentScore = 0;
          var postsAnalyzed = 0;
          var subredditPostsAnalyzed = 0;
-         
+         var removedSubredditCommentScore = 0;
+         var removedSubredditCommentCount = 0;
+
          var now = DateTime.Now;
          var userHistory = userHistoryCache.Query(username);
          foreach (var comment in userHistory.Comments.OrderByDescending(c => c.CreationTime)) {
@@ -110,12 +112,18 @@ namespace Berbot.Monitoring {
             if (comment.Subreddit == BerbotConfiguration.RedditSubredditName) {
                subredditPostsAnalyzed++;
 
-               // Don't count comments from before mods can get to them.
-               if ((now - comment.CreationTime) < TimeSpan.FromDays(3)) {
-                  tooNewCommentCount++;
-                  tooNewCommentScore += comment.Score;
+               // Don't count comments removed by mods.
+               if (comment.Removed) {
+                  removedSubredditCommentCount++;
+                  removedSubredditCommentScore += comment.Score;
                } else {
-                  subredditScore += comment.Score;
+                  // Don't count comments from before mods can get to them.
+                  if ((now - comment.CreationTime) < TimeSpan.FromDays(3)) {
+                     tooNewCommentCount++;
+                     tooNewCommentScore += comment.Score;
+                  } else {
+                     subredditScore += comment.Score;
+                  }
                }
             }
 
@@ -138,6 +146,10 @@ namespace Berbot.Monitoring {
 
          if (tooNewCommentCount != 0) {
             log.WriteLine($"{tooNewCommentCount} comments were too new to be counted, score {tooNewCommentScore}");
+         }
+
+         if (removedSubredditCommentCount != 0) {
+            log.WriteLine($"{removedSubredditCommentCount} comments were removed, score {removedSubredditCommentScore}");
          }
 
          var isNoob = true;
@@ -177,7 +189,7 @@ namespace Berbot.Monitoring {
          // debounce by 5 minutes.
          // for future: if no post happens between now and then, we should probably still exec in 5m to make
          // circumvention harder.
-         var newContributorString = $"{username} IsNewContributor: {isNewContributor}, Score {subredditScore} ({tooNewCommentScore}), Posts {subredditPostsAnalyzed} ({tooNewCommentCount}) of {postsAnalyzed}";
+         var newContributorString = $"{username} IsNewContributor: {isNewContributor}, Score {subredditScore} ({tooNewCommentScore} new, {removedSubredditCommentScore} rem), Posts {subredditPostsAnalyzed} ({tooNewCommentCount} new, {removedSubredditCommentCount} rem) of {postsAnalyzed}";
          userToNextEvaluationTime[username] = (now + TimeSpan.FromMinutes(5), newContributorString, currentMonitoringEpoch);
          log.WriteLine(newContributorString);
 

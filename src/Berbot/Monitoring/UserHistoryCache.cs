@@ -21,12 +21,13 @@ namespace Berbot.Monitoring {
          this.redditClient = connectionFactory.CreateModRedditClient();
       }
 
-      public UserHistorySnapshot Query(string username) {
+      public UserHistorySnapshot Query(string username, bool forceReevaluation = false) {
          var entry = dbClient.GetKeyValueEntry(KVSTORE_USER_HISTORY_ENTRY_TYPE, username);
 
          UserHistorySnapshot existingRecord = null;
          if (entry.ExistedInDatabase && 
              TryParseUserHistorySnapshot(entry.Value, out existingRecord) &&
+             !forceReevaluation &&
              (DateTime.Now - entry.UpdatedAt) < TimeSpan.FromDays(1)) {
             log.WriteLine("Using cached user history: " + username);
             return existingRecord;
@@ -74,6 +75,7 @@ namespace Berbot.Monitoring {
                   Score = c.Score,
                   Text = c.Body,
                   CreationTime = c.Created,
+                  Removed = c.Removed,
                };
 
                if (c.Subreddit == BerbotConfiguration.RedditSubredditName) {

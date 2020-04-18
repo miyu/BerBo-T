@@ -27,10 +27,12 @@ namespace Berbot {
          signalRepopulateCatchUpQueue.Add(null);
 
          var userHistoryCache = new UserHistoryCache(logManager.CreateContextLog("autoflairer-user-history"), connectionFactory);
-         userHistoryCache.Query("ItzWarty");
+         userHistoryCache.Query("ItzWarty", true);
 
          var autoflairerLog = logManager.CreateContextLog("autoflairer");
          var autoflairer = new Autoflairer(connectionFactory, userFlairContextFactory, autoflairerLog, userHistoryCache);
+         autoflairer.Reflair("ItzWarty");
+
          new Thread(() => {
             var autoflairerCatchUpQueue = new ConcurrentQueue<UserContentPostedEventArgs>();
             var autoflairerNewContentQueue = new BlockingCollection<UserContentPostedEventArgs>();
