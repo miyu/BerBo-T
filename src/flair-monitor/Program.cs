@@ -32,6 +32,7 @@ namespace Berbot {
          var autoflairerLog = logManager.CreateContextLog("autoflairer");
          var autoflairer = new Autoflairer(connectionFactory, userFlairContextFactory, autoflairerLog, userHistoryCache);
          autoflairer.Reflair("ItzWarty");
+         autoflairer.Reflair("dsirota1");
 
          new Thread(() => {
             var autoflairerCatchUpQueue = new ConcurrentQueue<UserContentPostedEventArgs>();

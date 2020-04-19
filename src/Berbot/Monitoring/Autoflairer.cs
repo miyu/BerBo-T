@@ -89,7 +89,8 @@ namespace Berbot.Monitoring {
          // Stop aggregating karma past this positive point.
          // This ensures that if a user has a negative past but a sufficiently positive future, their negative
          // past doesn't outweigh it.
-         const int StopAggregationKarmaThreshold = 250;
+         const int StopAggregationKarmaThreshold = 500;
+         const int MinStopAggregationPostThreshold = 10;
          (int posts, int karma)[] PostsAndKarmaThresholds = new[] {
             (10, 200),
             (20, 100),
@@ -140,7 +141,7 @@ namespace Berbot.Monitoring {
             }
 
             // Bail if we can guess the outcome
-            if (subredditScore > StopAggregationKarmaThreshold * 2 || subredditScore < -500) {
+            if ((subredditContributionsAnalyzed > MinStopAggregationPostThreshold && subredditScore > StopAggregationKarmaThreshold) || subredditScore < -500) {
                log.WriteLine($"Bailing at score threshold, score {subredditScore}");
                break;
             }
