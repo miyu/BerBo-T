@@ -7,6 +7,7 @@ using Dargon.Commons.Collections;
 using Dargon.Commons.Comparers;
 using Reddit;
 using Reddit.Controllers;
+using Reddit.Exceptions;
 using Reddit.Things;
 using Comment = Reddit.Controllers.Comment;
 using Post = Reddit.Controllers.Post;
