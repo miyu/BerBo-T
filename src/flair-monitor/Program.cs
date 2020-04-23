@@ -19,7 +19,8 @@ namespace Berbot {
          initAudit.WriteAudit("init", Environment.MachineName, "Initializing");
 
          initLog.WriteLine("Load Content Monitor");
-         var contentMonitor = new UserContentMonitor(logManager.CreateContextLog("content-monitor"), connectionFactory);
+         var contentMonitorLog = logManager.CreateContextLog("content-monitor");
+         var contentMonitor = new UserContentMonitor(contentMonitorLog, connectionFactory);
 
          initLog.WriteLine("Load Autoflairer");
          var userFlairContextFactory = new UserFlairContextFactory(connectionFactory);
@@ -80,9 +81,13 @@ namespace Berbot {
                   signalRepopulateCatchUpQueue.Take();
                }
 
-               autoflairer.IncrementMonitoringEpoch();
-               contentMonitor.NotifyInitialActiveSet();
-               nextRepopulateTime = DateTime.Now + TimeSpan.FromMinutes(5);
+               try {
+                  autoflairer.IncrementMonitoringEpoch();
+                  contentMonitor.NotifyInitialActiveSet();
+                  nextRepopulateTime = DateTime.Now + TimeSpan.FromMinutes(5);
+               } catch (Exception e) {
+                  contentMonitorLog.WriteException(e);
+               }
 
                // drain queue
                while (signalRepopulateCatchUpQueue.Count > 0) signalRepopulateCatchUpQueue.TryTake(out _);
