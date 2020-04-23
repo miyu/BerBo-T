@@ -27,5 +27,8 @@ namespace Berbot {
       
       public static readonly HashSet<string> AutoflareCssClassIgnoreList = new HashSet<string> {
       };
+      
+      public const int AutoflairPostKarmaThreshold = 1000;
+      public static readonly string[] AutoflairPostFlairOptionTextHintFragments = new[] { "Join", RedditSubredditName };
    }
 }

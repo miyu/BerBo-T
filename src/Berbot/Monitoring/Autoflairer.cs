@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using Berbot.Auditing;
 using Berbot.Logging;
 using Berbot.Utils;
@@ -41,11 +37,21 @@ namespace Berbot.Monitoring {
       }
 
       public void HandleContentPosted(UserContentPostedEventArgs e) {
-         if (e.IsDeletedAuthor || BerbotConfiguration.AutoflareUserIgnoreList.Contains(e.Author)) {
+         if (e.IsDeletedAuthor || BerbotConfiguration.AutoflairUserIgnoreList.Contains(e.Author)) {
             return;
          }
 
-         log.WriteLine($"Handling {e.Id} by {e.Author} {(e.Title ?? e.Content).ToShortString()}");
+         log.WriteLine($"Handling {(e.IsPost ? "post" : "comment")} {e.Id} by {e.Author} {(e.Title ?? e.Content).ToShortString()}");
+         if (e.IsPost && e.Post.Score > BerbotConfiguration.AutoflairPostKarmaThreshold && string.IsNullOrWhiteSpace(e.Post.Listing.LinkFlairText)) {
+            var choices = e.Post.FlairSelector("ItzWarty").Choices;
+            var baseFlair = choices.FirstOrDefault(c => BerbotConfiguration.AutoflairPostFlairOptionTextHintFragments.All(f => c.FlairText.IndexOf(f, StringComparison.OrdinalIgnoreCase) != -1));
+            log.WriteLine($"Score is {e.Post.Score}, flairing with {baseFlair?.FlairText ?? "[failed to find base flair]"}!");
+            if (baseFlair == null) {
+               log.WriteException(new Exception("Failed to find flair! Options: " + choices.Select(c => c.FlairText).Join(", ")));
+            } else {
+               e.Post.SetFlair(baseFlair.FlairText, baseFlair.FlairTemplateId);
+            }
+         }
 
          var now = DateTime.Now;
          if (userToNextEvaluationTime.TryGetValue(e.Author, out var record)) {
@@ -170,7 +176,7 @@ namespace Berbot.Monitoring {
 
          bool isNewContributor = isNoob;
          void UpdateFlairContext(UserFlairContext context) {
-            isNewContributor = isNoob && !BerbotConfiguration.AutoflareCssClassIgnoreList.Contains(context.FlairCssClass);
+            isNewContributor = isNoob && !BerbotConfiguration.AutoflairCssClassIgnoreList.Contains(context.FlairCssClass);
             context.SetNewContributor(isNewContributor);
          }
 

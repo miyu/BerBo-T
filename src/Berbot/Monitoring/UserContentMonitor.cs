@@ -78,6 +78,9 @@ namespace Berbot.Monitoring {
             AuthorFlairText = lp.Listing.AuthorFlairText,
             AuthorFlairCssClass = lp.Listing.AuthorFlairCSSClass,
             IsCatchUpLog = isCatchUpLog,
+            IsPost = true,
+            Post = lp,
+            Comment = null,
          }, isCatchUpLog);
       }
 
@@ -91,6 +94,9 @@ namespace Berbot.Monitoring {
             AuthorFlairText = sp.Listing.AuthorFlairText,
             AuthorFlairCssClass = sp.Listing.AuthorFlairCSSClass,
             IsCatchUpLog = isCatchUpLog,
+            IsPost = true,
+            Post = sp,
+            Comment = null,
          }, isCatchUpLog);
       }
 
@@ -105,6 +111,9 @@ namespace Berbot.Monitoring {
             AuthorFlairText = c.Listing.AuthorFlairText,
             AuthorFlairCssClass = c.Listing.AuthorFlairCSSClass,
             IsCatchUpLog = isCatchUpLog,
+            IsPost = false,
+            Post = null,
+            Comment = c,
          }, isCatchUpLog);
       }
 
@@ -128,6 +137,10 @@ namespace Berbot.Monitoring {
       public string AuthorFlairText;
       public string AuthorFlairCssClass;
       public bool IsCatchUpLog;
+      public bool IsPost;
+      
+      public Post Post;
+      public Comment Comment;
 
       public bool IsDeletedAuthor => Author.Contains("[deleted]", StringComparison.OrdinalIgnoreCase);
 
