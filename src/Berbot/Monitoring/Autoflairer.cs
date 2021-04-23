@@ -98,9 +98,9 @@ namespace Berbot.Monitoring {
          const int StopAggregationKarmaThreshold = 500;
          const int MinStopAggregationPostThreshold = 10;
          (int posts, int karma)[] PostsAndKarmaThresholds = new[] {
-            (10, 200),
-            (20, 100),
-            (30, 50)
+            (5, 200),
+            (10, 100),
+            (15, 50)
          };
 
 
@@ -117,10 +117,21 @@ namespace Berbot.Monitoring {
 
          var orderedContributions = userHistory.Comments.MergeSorted<ContributionSnapshot, long>(userHistory.Posts, x => -x.CreationTime.Ticks);
 
+         int postCount = 0;
+         int commentCount = 0;
+
          // Additional creationtime check as too lazy right now to verify above is properly sorted.
          foreach (var contribution in orderedContributions.OrderByDescending(c => c.CreationTime)) {
+            var isPost = contribution is PostSnapshot;
+
+            if (isPost) {
+               postCount++;
+            } else {
+               commentCount++;
+            }
+
             // Only count scores from our sub
-            if (contribution.Subreddit == BerbotConfiguration.RedditSubredditName) {
+            if (BerbotConfiguration.ScoreCountedRedditSubredditNames.Contains(contribution.Subreddit)) {
                subredditContributionsAnalyzed++;
 
                // Don't count comments removed by mods.
@@ -129,7 +140,8 @@ namespace Berbot.Monitoring {
                   removedSubredditContributionScore += contribution.Score;
                } else {
                   // Don't count comments from before mods can get to them.
-                  if ((now - contribution.CreationTime) < TimeSpan.FromDays(3)) {
+                  var timeThreshold = isPost ? TimeSpan.FromDays(1) : TimeSpan.FromDays(3);
+                  if ((now - contribution.CreationTime) < timeThreshold) {
                      tooNewCount++;
                      tooNewScore += contribution.Score;
                   } else {
@@ -153,7 +165,7 @@ namespace Berbot.Monitoring {
             }
          }
 
-         log.WriteLine($"Done counting {contributionsAnalyzed} contributions for {username}, {subredditContributionsAnalyzed} in sub, total score {subredditScore}");
+         log.WriteLine($"Done counting {contributionsAnalyzed} contributions for {username} ({commentCount} comments / {postCount} posts), {subredditContributionsAnalyzed} in sub, total score {subredditScore}");
 
          if (tooNewCount != 0) {
             log.WriteLine($"{tooNewCount} contributions were too new to be counted, score {tooNewScore}");

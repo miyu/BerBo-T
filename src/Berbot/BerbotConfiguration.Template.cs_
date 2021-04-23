@@ -21,6 +21,10 @@ namespace Berbot {
 
       public const string RedditSubredditName = "";
       
+      public static readonly HashSet<string> ScoreCountedRedditSubredditNames = new HashSet<string> {
+         // ...
+      };
+
       public static readonly HashSet<string> AutoflareUserIgnoreList = new HashSet<string> {
          "AutoModerator",
       };
